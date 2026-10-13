@@ -22,9 +22,9 @@ contract L1DeploymentProbe {
 /// chain with the brief's exact eight static words, and scans the runtimes for size and forbidden opcodes.
 contract LaunchV316L1Test is Test {
     bytes32 private constant SWARM_DESK_CREATION_HASH =
-        0x81b258d403f90ab53a3c52d0b5ee895e57b2c80667b6fb82b637c3cf92a17b59;
+        0x66ea1249e2e5a1c151924aede0ecbbfe2277afd6e63d478343f21b5980cd5174;
     bytes32 private constant ENDOWMENT_ESCROW_CREATION_HASH =
-        0x8120758fa38683db9af5b5dbd28c6bd5682f58f160e36b1fc951815082101087;
+        0x3eb0ef24b80b2233aac11051678d59258349d950020173b9ec40b4cba9a858d2;
     bytes32 private constant GAME_CONFIG_HASH = 0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3;
     address private constant BINDER = 0x6d51cBE774aeAe4dd40bCA2560E9bc2695A0d007;
     uint256 private constant POLICY_WORD = 5391989333430298100116863486635657822062725418115979424500284366258177;

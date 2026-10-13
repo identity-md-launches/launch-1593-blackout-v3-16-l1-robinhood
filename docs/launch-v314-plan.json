@@ -20,14 +20,14 @@
             "0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3",
             "0x6d51cBE774aeAe4dd40bCA2560E9bc2695A0d007"
           ],
-          "creationHash": "0x81b258d403f90ab53a3c52d0b5ee895e57b2c80667b6fb82b637c3cf92a17b59"
+          "creationHash": "0x66ea1249e2e5a1c151924aede0ecbbfe2277afd6e63d478343f21b5980cd5174"
         },
         {
           "name": "EndowmentEscrow",
           "constructorArgs": [
             "$contract:SwarmDesk"
           ],
-          "creationHash": "0x8120758fa38683db9af5b5dbd28c6bd5682f58f160e36b1fc951815082101087"
+          "creationHash": "0x3eb0ef24b80b2233aac11051678d59258349d950020173b9ec40b4cba9a858d2"
         }
       ]
     },
@@ -51,7 +51,7 @@
             "<L1_SWARM_DESK>",
             "0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3"
           ],
-          "creationHash": "0xb3a295abe415ce500a185349e2b831e67d06993d647b3831babacdfc96fb00d3"
+          "creationHash": "0xbfe8acae35ae92d6cdf33b71e117859f70089111ccabda5915b8eeec637e7260"
         }
       ]
     },
@@ -79,7 +79,7 @@
             "<SNAPSHOT_BLOCK>",
             "200000000000000000000000000"
           ],
-          "creationHash": "0xb763989d9f8be8f545dd607d7bc7810001086e9e65bdf6fe9521e5ec9ddc5c88"
+          "creationHash": "0x14085299ee5bb55a950ce12525fb066d8031572af3016e8c9d6ca4995f553b20"
         },
         {
           "name": "RewardPool",
@@ -93,7 +93,7 @@
           "constructorArgs": [
             "$contract:GameRegistry"
           ],
-          "creationHash": "0xf8f9f93e6bd8df85caaf5c508a71fb285a2f6229a5ef54023ac49ba66a14a001"
+          "creationHash": "0xd8633e772d6e391739b725df86f7ebae93c4f3fdb9c2c3c2cf3d403f4cf7ada0"
         },
         {
           "name": "FarmCore",

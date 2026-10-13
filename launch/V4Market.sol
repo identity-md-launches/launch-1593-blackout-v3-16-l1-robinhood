@@ -807,7 +807,7 @@ library Math {
 library ModuleCode {
     function launchHash(uint256 role) internal pure returns (bytes32) {
         if (role == 0) return 0xecf3ae5ebb791318703b5e79960cfd243b7d89bdffa0e0501bee5146623764de; // RewardPool
-        if (role == 1) return 0xf8f9f93e6bd8df85caaf5c508a71fb285a2f6229a5ef54023ac49ba66a14a001; // FarmRewards
+        if (role == 1) return 0xd8633e772d6e391739b725df86f7ebae93c4f3fdb9c2c3c2cf3d403f4cf7ada0; // FarmRewards
         if (role == 2) return 0xd6b7d7555a5865832a6d352b2a0bfa96ea10857b076a4cc156d5ad78cd1044fa; // FarmCore
         if (role == 3) return 0x98f7224201d9e7e3d16bd8996c29a522cac5bd1b375181de8cfdc2c6b9639e76; // FarmItems
         if (role == 4) return 0x7ecf36d55a73c01094e4434de085dfb39f17a1deda39a52ee38954f3a8e8737a; // PackSale
@@ -825,7 +825,7 @@ library ModuleCode {
 
     function repoHash(uint256 role) internal pure returns (bytes32) {
         if (role == 0) return 0xecf3ae5ebb791318703b5e79960cfd243b7d89bdffa0e0501bee5146623764de; // RewardPool
-        if (role == 1) return 0xf8f9f93e6bd8df85caaf5c508a71fb285a2f6229a5ef54023ac49ba66a14a001; // FarmRewards
+        if (role == 1) return 0xd8633e772d6e391739b725df86f7ebae93c4f3fdb9c2c3c2cf3d403f4cf7ada0; // FarmRewards
         if (role == 2) return 0xd6b7d7555a5865832a6d352b2a0bfa96ea10857b076a4cc156d5ad78cd1044fa; // FarmCore
         if (role == 3) return 0x98f7224201d9e7e3d16bd8996c29a522cac5bd1b375181de8cfdc2c6b9639e76; // FarmItems
         if (role == 4) return 0x7ecf36d55a73c01094e4434de085dfb39f17a1deda39a52ee38954f3a8e8737a; // PackSale

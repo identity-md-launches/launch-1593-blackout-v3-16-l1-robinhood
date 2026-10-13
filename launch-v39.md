@@ -20,13 +20,13 @@ Creation-code hashes exclude constructor words. CREATE2 prediction uses the crea
 
 | Launch | Contract | Creation-code hash (without constructor words) | Runtime bytes |
 |---|---|---|---|
-| L1 | SwarmDesk | `0x81b258d403f90ab53a3c52d0b5ee895e57b2c80667b6fb82b637c3cf92a17b59` | 22226 |
-| L1 | EndowmentEscrow | `0x8120758fa38683db9af5b5dbd28c6bd5682f58f160e36b1fc951815082101087` | 5008 |
-| L2 | V4Market | `0xb3a295abe415ce500a185349e2b831e67d06993d647b3831babacdfc96fb00d3` | 21259 |
+| L1 | SwarmDesk | `0x66ea1249e2e5a1c151924aede0ecbbfe2277afd6e63d478343f21b5980cd5174` | 22226 |
+| L1 | EndowmentEscrow | `0x3eb0ef24b80b2233aac11051678d59258349d950020173b9ec40b4cba9a858d2` | 5008 |
+| L2 | V4Market | `0xbfe8acae35ae92d6cdf33b71e117859f70089111ccabda5915b8eeec637e7260` | 21259 |
 | L3 | Params | `0x26c9f36af040b02eba9644f52daeed84fae4e42eab9bdb23277d0bb28c6dc6c0` | 3118 |
-| L3 | GameRegistry | `0xb763989d9f8be8f545dd607d7bc7810001086e9e65bdf6fe9521e5ec9ddc5c88` | 2864 |
+| L3 | GameRegistry | `0x14085299ee5bb55a950ce12525fb066d8031572af3016e8c9d6ca4995f553b20` | 2864 |
 | L3 | RewardPool | `0xecf3ae5ebb791318703b5e79960cfd243b7d89bdffa0e0501bee5146623764de` | 4234 |
-| L3 | FarmRewards | `0xf8f9f93e6bd8df85caaf5c508a71fb285a2f6229a5ef54023ac49ba66a14a001` | 16350 |
+| L3 | FarmRewards | `0xd8633e772d6e391739b725df86f7ebae93c4f3fdb9c2c3c2cf3d403f4cf7ada0` | 16519 |
 | L3 | FarmCore | `0xd6b7d7555a5865832a6d352b2a0bfa96ea10857b076a4cc156d5ad78cd1044fa` | 22027 |
 | L3 | FarmItems | `0x98f7224201d9e7e3d16bd8996c29a522cac5bd1b375181de8cfdc2c6b9639e76` | 13861 |
 | L3 | PackSale | `0x7ecf36d55a73c01094e4434de085dfb39f17a1deda39a52ee38954f3a8e8737a` | 12538 |
@@ -54,9 +54,9 @@ The Desk takes eight static words. The eighth is the binder 0x6d51cBE774aeAe4dd4
 GAME_CONFIG_HASH: 0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3.
 Exact ordered constructor words and expected creation hashes:
 [0] SwarmDesk ["0x6f7261636c652e72657175657374406f7261636c652d31000000000000000000","5391989333430298100116863486635657822062725418115979424500284366258177","0x2fc5a57f2c5f7bc083ea8ac5016234f1a0b1c68a514e5d921956cc57948534ef","0xc13efed8438aab53ea052a4507def2dc4ce9856765520dfa28c66daa59cfc11d","0x00e69e4445c7ca7256338293f9f9cea439fd2beb1959d1d43ebec7b14493e2f6","0xc0ae7511b06744cf7ccadc6b60ff9ff96cb7234cf32988850df33324861cc8df","0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3","0x6d51cBE774aeAe4dd40bCA2560E9bc2695A0d007"]
-Creation hash: 0x81b258d403f90ab53a3c52d0b5ee895e57b2c80667b6fb82b637c3cf92a17b59
+Creation hash: 0x66ea1249e2e5a1c151924aede0ecbbfe2277afd6e63d478343f21b5980cd5174
 [1] EndowmentEscrow ["$contract:SwarmDesk"]
-Creation hash: 0x8120758fa38683db9af5b5dbd28c6bd5682f58f160e36b1fc951815082101087
+Creation hash: 0x3eb0ef24b80b2233aac11051678d59258349d950020173b9ec40b4cba9a858d2
 No literal IMD protocol addresses may appear as constructor words. Protocol endpoints are compiled in; allowed platform placeholders and named contract references stay as shown.
 Accepted findings (docs/accepted-v316.md; info 5 and info 6 abridged here to the objective limit, their full audit text is in that file):
 - Accepted — RewardPool shortfall: repair an accounting shortfall with a plain token transfer to RewardPool; `donate` is not the shortfall-repair path.
@@ -85,7 +85,7 @@ Deploy the platform token plus V4Market hook using onchain univ4_hook, pairWith 
 GAME_CONFIG_HASH: 0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3.
 Exact ordered constructor words and expected creation hashes:
 [0] V4Market ["$poolManager","$token","12500","60","$factory","<L1_SWARM_DESK>","0x11ed7438974e96ecc962201e9c46422c7bf239d725876863fa25a56c734b20d3"]
-Creation hash: 0xb3a295abe415ce500a185349e2b831e67d06993d647b3831babacdfc96fb00d3
+Creation hash: 0xbfe8acae35ae92d6cdf33b71e117859f70089111ccabda5915b8eeec637e7260
 No literal IMD protocol addresses may appear as constructor words. Protocol endpoints are compiled in; allowed platform placeholders and named contract references stay as shown.
 Accepted findings (docs/accepted-v316.md; info 5 and info 6 abridged here to the objective limit, their full audit text is in that file):
 - Accepted — RewardPool shortfall: repair an accounting shortfall with a plain token transfer to RewardPool; `donate` is not the shortfall-repair path.
@@ -116,11 +116,11 @@ Exact ordered constructor words and expected creation hashes:
 [0] Params ["<L1_SWARM_DESK>","200","1000000000000000000"]
 Creation hash: 0x26c9f36af040b02eba9644f52daeed84fae4e42eab9bdb23277d0bb28c6dc6c0
 [1] GameRegistry ["<L2_TOKEN>","$contract:Params","<L2_V4MARKET>","<STARTER_ROOT>","<FREE_ROOT>","<SNAPSHOT_BLOCK>","200000000000000000000000000"]
-Creation hash: 0xb763989d9f8be8f545dd607d7bc7810001086e9e65bdf6fe9521e5ec9ddc5c88
+Creation hash: 0x14085299ee5bb55a950ce12525fb066d8031572af3016e8c9d6ca4995f553b20
 [2] RewardPool ["$contract:GameRegistry"]
 Creation hash: 0xecf3ae5ebb791318703b5e79960cfd243b7d89bdffa0e0501bee5146623764de
 [3] FarmRewards ["$contract:GameRegistry"]
-Creation hash: 0xf8f9f93e6bd8df85caaf5c508a71fb285a2f6229a5ef54023ac49ba66a14a001
+Creation hash: 0xd8633e772d6e391739b725df86f7ebae93c4f3fdb9c2c3c2cf3d403f4cf7ada0
 [4] FarmCore ["$contract:GameRegistry"]
 Creation hash: 0xd6b7d7555a5865832a6d352b2a0bfa96ea10857b076a4cc156d5ad78cd1044fa
 [5] FarmItems ["$contract:GameRegistry"]

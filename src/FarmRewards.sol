@@ -17,6 +17,9 @@ contract FarmRewards is GameModule, ReentrancyGuard {
     uint256 public constant PRECISION = 1e27;
     /// @notice A commitment stays in the global denominator for this many epochs after the last owner action.
     uint256 public constant IDLE_EPOCHS = 12;
+    /// @notice The farm price basis (`lastFarmDaily`) rises to any higher settled yield at once and otherwise
+    /// decays by 1/96 per settled epoch (about 4% a day), so one low-yield epoch cannot reprice a farm to the floor.
+    uint256 public constant FARM_DAILY_DECAY = 96;
 
     struct Epoch {
         uint64 start;
@@ -421,7 +424,13 @@ contract FarmRewards is GameModule, ReentrancyGuard {
         // Protocol maximum district/event boosts bound productive hash by 150% of committed allocation hash.
         if (spent > o.allocation) revert InvalidValue();
         _credit(p, o.net + o.redis, id, e.end);
-        lastFarmDaily[p] = o.net * 4;
+        // Sticky price basis: a pro-rata entry epoch is scaled to its full-epoch equivalent, and a settled
+        // yield below the decayed previous basis (an engineered or event-hit zero-net epoch) only decays it.
+        uint256 daily = o.net * 4;
+        uint256 entry = entrySeconds[id][p];
+        if (entry != 0) daily = Math.mulDiv(daily, EPOCH, entry);
+        uint256 previous = lastFarmDaily[p];
+        lastFarmDaily[p] = Math.max(daily, previous - previous / FARM_DAILY_DECAY);
         core().autoRepair(p, id);
         e.spent += spent;
         e.allocated += o.allocation;
