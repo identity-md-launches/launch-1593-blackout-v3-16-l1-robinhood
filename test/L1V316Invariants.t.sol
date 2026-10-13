@@ -30,6 +30,9 @@ contract EscrowHandler is Test {
     bytes private poolCode;
     uint64 private game;
     uint64 private tokenLaunch;
+    /// @dev A second registry that passes every Desk proof (same Desk, token, hook and commitment) at `twinGame`.
+    GameRegistry public twin;
+    uint64 private twinGame;
 
     uint256 public deposited;
     uint256 public forwardedAmount;
@@ -41,9 +44,11 @@ contract EscrowHandler is Test {
         EndowmentEscrow escrow_,
         SwarmDesk desk_,
         GameRegistry registry_,
+        GameRegistry twin_,
         bytes memory registryCode_,
         bytes memory poolCode_,
         uint64 game_,
+        uint64 twinGame_,
         uint64 tokenLaunch_,
         address binder_,
         address funder_
@@ -51,15 +56,37 @@ contract EscrowHandler is Test {
         escrow = escrow_;
         desk = desk_;
         registry = registry_;
+        twin = twin_;
         token = MockToken(registry_.token());
         pool = registry_.module(0);
         registryCode = registryCode_;
         poolCode = poolCode_;
         game = game_;
+        twinGame = twinGame_;
         tokenLaunch = tokenLaunch_;
         binder = binder_;
         funder = funder_;
         actors = [makeAddr("escrow actor 0"), makeAddr("escrow actor 1"), makeAddr("escrow actor 2")];
+    }
+
+    /// @dev The binder may bind the twin instead of the canonical registry (both pass every proof); whichever it
+    /// binds first wins, and the escrow must then follow that choice. A non-binder never succeeds.
+    function bindTwin(uint256 who, bool asBinder) external {
+        address caller = asBinder ? binder : actors[who % 3];
+        vm.prank(caller);
+        try desk.bind(address(twin), registryCode, type(Params).creationCode, twinGame, 1, twinGame, 0, tokenLaunch) {
+            if (caller != binder) violations += 1;
+        } catch {}
+    }
+
+    /// @dev A forward to the twin succeeds only when the Desk bound the twin; any other success is a violation.
+    function forwardTwin(uint256 who) external {
+        vm.prank(actors[who % 3]);
+        try escrow.forward(address(twin), twinGame, 1, registryCode, twinGame, 2, poolCode) returns (uint256 sent) {
+            forwardedAmount += sent;
+            forwardCount += 1;
+            if (address(desk.registry()) != address(twin)) violations += 1;
+        } catch {}
     }
 
     function deposit(uint256 amount) external {
@@ -122,10 +149,12 @@ contract L1V316EscrowInvariantsTest is BaseTest {
     uint256 private constant ENDOWMENT = 200_000_000 ether;
     uint64 private constant N_TOKEN = 73;
     uint64 private constant N_GAME = 74;
+    uint64 private constant N_TWIN = 75;
     EscrowHandler private handler;
     EndowmentEscrow private escrow;
     SwarmDesk private fresh;
     GameRegistry private registry;
+    GameRegistry private twin;
 
     function launchFeatures() internal pure override returns (bool) {
         return false;
@@ -168,8 +197,25 @@ contract L1V316EscrowInvariantsTest is BaseTest {
         registry = GameRegistry(f.deploy(N_GAME, 1, bytes.concat(registryCode, args)));
         f.deploy(N_GAME, 2, bytes.concat(poolCode, abi.encode(address(registry))));
         registry.register(0, N_GAME, 2, poolCode);
-        handler =
-            new EscrowHandler(escrow, fresh, registry, registryCode, poolCode, N_GAME, N_TOKEN, team, address(this));
+        // A proven twin at N_TWIN: same Desk, token, hook and commitment, its own Params and RewardPool.
+        Params tp = Params(
+            f.deploy(N_TWIN, 0, bytes.concat(paramsCode, abi.encode(address(fresh), uint256(200), uint256(1 ether))))
+        );
+        bytes memory targs = abi.encode(
+            address(token),
+            address(tp),
+            address(hook),
+            d.registry.starterRoot(),
+            d.registry.freeRoot(),
+            d.registry.snapshotBlock(),
+            ENDOWMENT
+        );
+        twin = GameRegistry(f.deploy(N_TWIN, 1, bytes.concat(registryCode, targs)));
+        f.deploy(N_TWIN, 2, bytes.concat(poolCode, abi.encode(address(twin))));
+        twin.register(0, N_TWIN, 2, poolCode);
+        handler = new EscrowHandler(
+            escrow, fresh, registry, twin, registryCode, poolCode, N_GAME, N_TWIN, N_TOKEN, team, address(this)
+        );
         targetContract(address(handler));
     }
 
@@ -177,8 +223,15 @@ contract L1V316EscrowInvariantsTest is BaseTest {
         assertEq(token.balanceOf(address(escrow)), handler.deposited() - handler.forwardedAmount());
     }
 
+    /// @dev Whatever left the escrow sits in exactly one pool: the bound registry's. The other pool never receives.
     function invariant_poolReceivedExactlyWhatTheEscrowForwarded() public view {
-        assertEq(token.balanceOf(registry.module(0)), handler.forwardedAmount());
+        uint256 canonical = token.balanceOf(registry.module(0));
+        uint256 other = token.balanceOf(twin.module(0));
+        assertEq(canonical + other, handler.forwardedAmount());
+        address bound = address(fresh.registry());
+        if (bound == address(registry)) assertEq(other, 0, "the twin's pool received while the canonical was bound");
+        else if (bound == address(twin)) assertEq(canonical, 0, "the canonical pool received while the twin was bound");
+        else assertEq(canonical + other, 0, "something forwarded before any bind");
     }
 
     function invariant_atMostOneExitAndItNeverReopens() public view {
@@ -187,13 +240,18 @@ contract L1V316EscrowInvariantsTest is BaseTest {
         assertEq(handler.violations(), 0, "a wrong proof or a non-binder bind succeeded, or forwarded flipped back");
     }
 
-    function invariant_forwardImpliesTheBinderBoundThisRegistry() public view {
-        if (handler.forwardCount() == 1) {
-            assertEq(address(fresh.registry()), address(registry));
-            assertEq(fresh.tokenLaunch(), N_TOKEN);
-        }
+    /// @dev The Desk is bound to nothing or to one of the two proven registries, never anything else, and a forward
+    /// implies the binder bound the registry the funds went to with the recorded L2 number.
+    function invariant_forwardImpliesTheBinderBoundThatRegistry() public view {
         address bound = address(fresh.registry());
-        assertTrue(bound == address(0) || bound == address(registry), "bound to something else");
+        assertTrue(bound == address(0) || bound == address(registry) || bound == address(twin), "bound elsewhere");
+        if (handler.forwardCount() == 1) {
+            assertTrue(bound != address(0), "forwarded while unbound");
+            assertEq(fresh.tokenLaunch(), N_TOKEN);
+            assertEq(token.balanceOf(GameRegistry(bound).module(0)), handler.forwardedAmount());
+        } else {
+            assertEq(fresh.tokenLaunch(), bound == address(0) ? 0 : N_TOKEN);
+        }
     }
 }
 

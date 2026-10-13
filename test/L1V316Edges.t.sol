@@ -11,6 +11,7 @@ import {SwarmArgs} from "../script/SwarmArgs.sol";
 import {LocalApplicationFactory, LocalLaunchFactory} from "../script/Deploy.s.sol";
 import {TestV4Market, MockV4Manager} from "./mocks/MockV4Manager.sol";
 import {MockToken} from "./mocks/MockToken.sol";
+import {OracleAttestation} from "../src/oracle/OracleAttestation.sol";
 import "../src/lib/Errors.sol";
 
 /// @dev A market that only echoes the three values `_proveHook` reads from the hook. It has code, so the v3.14
@@ -568,5 +569,167 @@ contract L1V316EdgesTest is BaseTest {
         (bool okEth,) = address(escrow).call{value: 1 ether}("");
         assertFalse(okEth, "no receive");
         assertEq(token.balanceOf(address(escrow)), ENDOWMENT);
+    }
+
+    // ───────────────────────────── revision: the proofs' other refusals ─────────────────────────────
+
+    /// @dev The binder with the wrong pinned code is refused by the hash check before the candidate is touched:
+    /// a candidate without code still yields InvalidProof (not a bare revert from the first staticcall), and the
+    /// two pins are not interchangeable.
+    function testBinderWithWrongCreationCodeIsRefusedBeforeTheCandidateIsRead() public {
+        address noCode = makeAddr("never deployed");
+        bytes memory garbage = hex"ff";
+        vm.startPrank(team);
+        vm.expectRevert(InvalidProof.selector);
+        fresh.bind(noCode, garbage, paramsCode, N_GAME, 1, N_GAME, 0, N_TOKEN);
+        vm.expectRevert(InvalidProof.selector);
+        fresh.bind(noCode, registryCode, garbage, N_GAME, 1, N_GAME, 0, N_TOKEN);
+        // Swapped pins: Params code where the registry's is expected and vice versa.
+        vm.expectRevert(InvalidProof.selector);
+        fresh.bind(address(registry), paramsCode, registryCode, N_GAME, 1, N_GAME, 0, N_TOKEN);
+        // The pool's code is a module pin, not the registry pin.
+        vm.expectRevert(InvalidProof.selector);
+        fresh.bind(address(registry), poolCode, paramsCode, N_GAME, 1, N_GAME, 0, N_TOKEN);
+        vm.stopPrank();
+        assertEq(address(fresh.registry()), address(0));
+    }
+
+    /// @dev Every L2 number other than the one whose record names (ETH, token, hook) is refused: unrecorded
+    /// numbers read as zeros, and other records name other hooks or other tokens.
+    /// forge-config: default.fuzz.runs = 512
+    function testFuzzOnlyTheRecordedTokenLaunchBinds(uint64 tl) public {
+        tl = uint64(bound(tl, 1, type(uint64).max));
+        // One run in eight lands on the genuine number so the success branch is exercised, not only the refusals.
+        if (tl % 8 == 0) tl = N_TOKEN;
+        else if (tl % 8 == 1) tl = uint64(bound(tl, 90, 92));
+        MockToken other = new MockToken();
+        TestV4Market otherHook =
+            new TestV4Market(address(manager), address(other), address(bindingFactory), address(fresh), configHash);
+        manager.initializeHook(otherHook);
+        lf.record(90, address(0), address(other), address(otherHook), bob);
+        lf.record(91, address(0), address(token), address(otherHook), bob);
+        lf.record(92, address(token), address(token), address(hook), bob);
+        (bool ok, bytes memory reason) = _bind(team, address(registry), N_GAME, tl);
+        if (tl == N_TOKEN) {
+            assertTrue(ok, "the genuine record binds");
+            assertEq(fresh.tokenLaunch(), N_TOKEN);
+        } else {
+            assertFalse(ok);
+            assertEq(bytes4(reason), InvalidProof.selector);
+            assertEq(address(fresh.registry()), address(0));
+            assertEq(fresh.tokenLaunch(), 0);
+        }
+    }
+
+    /// @dev Before L3 binds, the L1 Desk can neither spend what it holds nor accept an answer from anyone: the
+    /// endowment-side IMD waits with no exit, and no selector but the binder's is live.
+    function testUnboundDeskHoldsDonationsAndRefusesEveryOracleEntry() public {
+        token.transfer(address(fresh), 3 ether);
+        SwarmDesk.OracleConfig memory o = fresh.oracleConfig();
+        vm.warp((block.timestamp / 6 hours + 1) * 6 hours + 2 hours);
+        vm.prank(bob);
+        vm.expectRevert(NotConfigured.selector);
+        fresh.askBackup(0, bytes("event body"));
+        vm.expectRevert(InvalidValue.selector);
+        fresh.askBackup(2, bytes("event body"));
+        OracleAttestation.Attestation memory a;
+        a.requestId = keccak256("r");
+        a.questionHash = o.questions[0];
+        vm.expectRevert(NotConfigured.selector);
+        fresh.submit(a, "");
+        vm.prank(o.intake);
+        vm.expectRevert(NotConfigured.selector);
+        fresh.onOracleResult(keccak256("i"), a, "");
+        vm.prank(bob);
+        vm.expectRevert(Unauthorized.selector);
+        fresh.onOracleResult(keccak256("i"), a, "");
+        vm.expectRevert(InvalidProof.selector);
+        fresh.execute(0, "");
+        vm.prank(bob);
+        vm.expectRevert(Unauthorized.selector);
+        fresh.onOracleFailure(keccak256("i"), 1, bytes32("x"), 0, 0, "");
+        vm.expectRevert(TooEarly.selector);
+        fresh.clearExpired(keccak256("i"));
+        assertEq(token.balanceOf(address(fresh)), 3 ether, "nothing left the unbound Desk");
+        assertEq(token.allowance(address(fresh), o.intake), 0);
+    }
+
+    /// @dev A second registry that passes every proof for this Desk is still refused by the escrow once the binder
+    /// chose the first: the escrow follows `desk.registry()`, not the proofs alone, so the binder's choice is final
+    /// for the endowment too.
+    function testEscrowRefusesAProvenRegistryTheDeskDidNotBind() public {
+        token.transfer(address(escrow), ENDOWMENT);
+        GameRegistry twin = _game(85, address(fresh), address(token), address(hook), ENDOWMENT);
+        // Unbound: neither registry forwards.
+        (bool ok, bytes memory reason) = _forward(bob, twin, 85);
+        assertFalse(ok);
+        assertEq(bytes4(reason), InvalidProof.selector);
+        _bindGenuine();
+        // Bound to `registry`: the twin passes the factory, Params and pin proofs but is not the bound one.
+        (ok, reason) = _forward(bob, twin, 85);
+        assertFalse(ok);
+        assertEq(bytes4(reason), InvalidProof.selector);
+        // Mixed coordinates: the bound registry with the twin's launch, and the twin's pool for the bound registry.
+        vm.expectRevert(InvalidProof.selector);
+        escrow.forward(address(registry), 85, 1, registryCode, N_GAME, 2, poolCode);
+        vm.expectRevert(InvalidProof.selector);
+        escrow.forward(address(registry), N_GAME, 1, registryCode, 85, 2, poolCode);
+        assertFalse(escrow.forwarded());
+        assertEq(token.balanceOf(address(escrow)), ENDOWMENT);
+        (ok,) = _forward(bob, registry, N_GAME);
+        assertTrue(ok);
+        assertEq(token.balanceOf(address(pool)), ENDOWMENT);
+        assertEq(token.balanceOf(twin.module(0)), 0, "the twin's pool got nothing");
+    }
+
+    /// @dev A launch number the ProjectFactory never admitted is refused even with the right code and a registry
+    /// whose own coordinates are right: `isRecorded` is checked before any prediction.
+    function testEscrowRefusesUnrecordedLaunchNumbers() public {
+        token.transfer(address(escrow), ENDOWMENT);
+        _bindGenuine();
+        assertFalse(f.isRecorded(900));
+        vm.expectRevert(InvalidProof.selector);
+        escrow.forward(address(registry), 900, 1, registryCode, N_GAME, 2, poolCode);
+        vm.expectRevert(InvalidProof.selector);
+        escrow.forward(address(registry), N_GAME, 1, registryCode, 900, 2, poolCode);
+        // Recorded by another launch (the Desk's own L1 number) but not where the registry lives.
+        assertTrue(f.isRecorded(70));
+        vm.expectRevert(InvalidProof.selector);
+        escrow.forward(address(registry), 70, 1, registryCode, N_GAME, 2, poolCode);
+        assertFalse(escrow.forwarded());
+    }
+
+    /// @dev The escrow forwards only the bound registry's token. Any other asset sent to it has no exit at all,
+    /// and the one exit is spent on the game token alone; recorded here as the documented one-exit design.
+    function testEscrowForwardsOnlyTheRegistryTokenAndStrandsOthers() public {
+        MockToken stray = new MockToken();
+        stray.mint(address(escrow), 5 ether);
+        token.transfer(address(escrow), ENDOWMENT);
+        _bindGenuine();
+        vm.expectEmit(true, true, true, true, address(escrow));
+        emit Forwarded(address(registry), address(pool), address(token), ENDOWMENT);
+        assertEq(escrow.forward(address(registry), N_GAME, 1, registryCode, N_GAME, 2, poolCode), ENDOWMENT);
+        assertEq(stray.balanceOf(address(escrow)), 5 ether, "a stray asset stays");
+        assertEq(stray.balanceOf(address(pool)), 0);
+        assertTrue(escrow.forwarded());
+    }
+
+    /// @dev `forwarded` is written before the transfer, so a token that re-enters any escrow function during the
+    /// transfer sees the closed state; here the callback is a second forward with the twin's coordinates.
+    function testEscrowReentryWithOtherCoordinatesIsAlsoRefused() public {
+        token.transfer(address(escrow), ENDOWMENT);
+        GameRegistry twin = _game(86, address(fresh), address(token), address(hook), ENDOWMENT);
+        _bindGenuine();
+        token.setCallback(
+            address(escrow),
+            abi.encodeWithSelector(
+                EndowmentEscrow.forward.selector, address(twin), 86, uint256(1), registryCode, 86, uint256(2), poolCode
+            )
+        );
+        assertEq(escrow.forward(address(registry), N_GAME, 1, registryCode, N_GAME, 2, poolCode), ENDOWMENT);
+        assertFalse(token.callbackSucceeded());
+        assertEq(token.balanceOf(address(pool)), ENDOWMENT);
+        assertEq(token.balanceOf(twin.module(0)), 0);
+        token.setCallback(address(0), "");
     }
 }
